@@ -25,6 +25,7 @@ dependencies {
         exclude group: 'com.android.support', module: 'support-annotations'
     })
     compile 'com.android.support:appcompat-v7:24.0.0'
+    compile "com.squareup.picasso:picasso:2.5.2"
     compile project(':galleryview')
     testCompile 'junit:junit:4.12'
 }

@@ -29,17 +29,12 @@ public class GalleryView extends ViewGroup {
     /**
      * current picture index, ranged from 0 to picture length
      */
-    private int picIndex=2;
+    private int picIndex=0;
 
     /**
      * initial picture index, constant, any number between 0 and picture length-1
      */
-    private final int initPicIndex=2;
-
-    /**
-     * number of pictures
-     */
-    private final int picLength=10;
+    private final int initPicIndex=0;
 
     private int customPaddingLeft=0;
 
@@ -49,6 +44,8 @@ public class GalleryView extends ViewGroup {
     private LayoutParams layoutParams;
 
     private OnScrollEndListener scrollEndListener;
+
+    private GalleryAdapter adapter;
 
     public GalleryView(Context context) {
         super(context);
@@ -71,14 +68,13 @@ public class GalleryView extends ViewGroup {
         frames[1] = new ScalableImageView(getContext());//frames[1].setBackgroundColor(getResources().getColor(android.R.color.holo_green_dark));
         frames[2] = new ScalableImageView(getContext());//frames[2].setBackgroundColor(getResources().getColor(android.R.color.holo_orange_dark));
         layoutParams = new MarginLayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT);
-        frames[0].setImageResource(R.drawable.koala);
+        /*frames[0].setImageResource(R.drawable.koala);
         frames[1].setImageResource(R.drawable.hydrangeas);
-        frames[2].setImageResource(R.drawable.penguins);
+        frames[2].setImageResource(R.drawable.penguins);*/
         for (ScalableImageView frame : frames) {
             frame.resetImageState();
             addView(frame, layoutParams);
         }
-        updateFramesVisibility();
 
         mScroller = new Scroller(getContext());
         mVelocityTracker = VelocityTracker.obtain();
@@ -86,7 +82,7 @@ public class GalleryView extends ViewGroup {
 
     private void updateFramesVisibility(){
         for(int i=0;i<frames.length;++i){
-            if(picIndex+i-1<0||picIndex+i-1>=picLength)frames[i].setVisibility(INVISIBLE);
+            if(picIndex+i-1<0||picIndex+i-1>=adapter.getCount())frames[i].setVisibility(INVISIBLE);
             else frames[i].setVisibility(VISIBLE);
         }
     }
@@ -99,6 +95,7 @@ public class GalleryView extends ViewGroup {
             removeView(frames[2]);
             customPaddingLeft = customPaddingLeft-getWidth();
             addView(frames[2],0,layoutParams);
+            fillFrame(picIndex-1, frames[2]);
             shiftFrames(-1);
             updateFramesVisibility();
         }else if(childIndex==1){//scroll to right
@@ -106,6 +103,7 @@ public class GalleryView extends ViewGroup {
             removeView(frames[0]);
             customPaddingLeft = customPaddingLeft+getWidth();
             addView(frames[0],layoutParams);
+            fillFrame(picIndex+1, frames[0]);
             shiftFrames(1);
             updateFramesVisibility();
         }
@@ -158,6 +156,30 @@ public class GalleryView extends ViewGroup {
             else canHandle = childCanScroll[3];
         }
         return canHandle;
+    }
+
+    public void setAdapter(GalleryAdapter adapter) {
+        this.adapter = adapter;
+        updateFramesVisibility();
+        fillInitialFrames();
+    }
+
+    public GalleryAdapter getAdapter() {
+        return adapter;
+    }
+
+    private void fillInitialFrames(){
+        for(int i=0;i<frames.length;++i){
+            if(picIndex+i-1<0||picIndex+i-1>=adapter.getCount())continue;
+            else {
+                adapter.fillViewAtPosition(picIndex+i-1, frames[i]);
+            }
+        }
+    }
+
+    private void fillFrame(int position, ScalableImageView imageView){
+        if(position<0||position>=adapter.getCount())return;
+        adapter.fillViewAtPosition(position, imageView);
     }
 
     @Override
@@ -249,7 +271,7 @@ public class GalleryView extends ViewGroup {
                     childIndex = (int)Math.floor((scrollX+ getWidth() /2)*1.0/ getWidth());
                 }
                 childIndex = Math.max(-1, Math.min(childIndex, 1));
-                if(picIndex+childIndex<0||picIndex+childIndex>=picLength)childIndex=0;
+                if(picIndex+childIndex<0||picIndex+childIndex>=adapter.getCount())childIndex=0;
                 picIndex+=childIndex;
                 //Log.i("gallery", childIndex+" "+scrollX+" "+getWidth());
                 int dx = childIndex* getWidth() -scrollX;
