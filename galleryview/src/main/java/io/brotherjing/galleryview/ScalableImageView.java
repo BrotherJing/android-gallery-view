@@ -72,7 +72,6 @@ public class ScalableImageView extends ImageView {
             case MotionEvent.ACTION_DOWN:
                 mode = MODE_DRAG;
                 bound = getImageBound();
-                currentTotalScale = totalScale;
                 lastDx = 0;
                 lastDy = 0;
                 dragStartPoint.set(event.getX(), event.getY());
@@ -129,6 +128,7 @@ public class ScalableImageView extends ImageView {
                 mode = MODE_NONE;
                 break;
             case MotionEvent.ACTION_POINTER_DOWN:
+                currentTotalScale = totalScale;
                 startDistance = distance(event);
                 if(startDistance >10f){
                     getParent().requestDisallowInterceptTouchEvent(true);
