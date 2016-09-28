@@ -6,6 +6,7 @@ import android.graphics.PointF;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.MotionEvent;
+import android.view.ViewConfiguration;
 import android.widget.ImageView;
 
 /**
@@ -14,12 +15,18 @@ import android.widget.ImageView;
 
 public class ScalableImageView extends ImageView {
 
+    private boolean firstTouch = true;
+
+    private int touchSlop;
+
     private int mode;
     private static final int MODE_NONE = 0;
     private static final int MODE_DRAG = 1;
     private static final int MODE_ZOOM = 2;
 
     private PointF dragStartPoint = new PointF();
+    float[] bound;
+    private float dx, dy, lastDx, lastDy;
 
     private Matrix matrix = new Matrix();
     private Matrix currentMatrix = new Matrix();
@@ -32,19 +39,27 @@ public class ScalableImageView extends ImageView {
 
     public ScalableImageView(Context context) {
         super(context);
+        init();
     }
 
     public ScalableImageView(Context context, AttributeSet attrs) {
         super(context, attrs);
+        init();
     }
 
     public ScalableImageView(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
+        init();
+    }
+
+    private void init(){
+        touchSlop = ViewConfiguration.get(getContext()).getScaledTouchSlop();
     }
 
     public void resetImageState(){
         totalScale = 1f;
         setScaleType(ScaleType.CENTER_INSIDE);
+        firstTouch = true;
     }
 
     @Override
@@ -52,12 +67,19 @@ public class ScalableImageView extends ImageView {
         switch (event.getAction()&MotionEvent.ACTION_MASK){
             case MotionEvent.ACTION_DOWN:
                 mode = MODE_DRAG;
+                bound = getImageBound();
                 currentTotalScale = totalScale;
+                lastDx = dx;
+                lastDy = dy;
                 dragStartPoint.set(event.getX(), event.getY());
                 currentMatrix.set(getImageMatrix());
+                if(firstTouch){
+                    setScaleType(ScaleType.MATRIX);
+                    matrix.set(getImageMatrix());
+                    firstTouch = false;
+                }
                 break;
             case MotionEvent.ACTION_MOVE:
-                setScaleType(ImageView.ScaleType.MATRIX);
                 if(mode==MODE_ZOOM){
                     float distance = distance(event);
                     if(distance>10f){
@@ -75,13 +97,27 @@ public class ScalableImageView extends ImageView {
                         matrix.postScale(scale, scale, midPoint.x, midPoint.y);
                     }
                 }else if(mode==MODE_DRAG){
-                    float dx = event.getX()-dragStartPoint.x;
-                    float dy = event.getY()-dragStartPoint.y;
-                    if(Math.abs(dy)>Math.abs(dx)){
-                        getParent().requestDisallowInterceptTouchEvent(true);
+                    getParent().requestDisallowInterceptTouchEvent(true);
+                    dx = event.getX()-dragStartPoint.x;
+                    dy = event.getY()-dragStartPoint.y;
+                    boolean canScroll[] = getCanScroll();
+                    boolean shouldCancelX=false,shouldCancelY=false;
+                    if(Math.abs(dx)>Math.abs(dy)){
+                        if(dx>0&&!canScroll[0]||dx<0&&!canScroll[2])shouldCancelX = true;
+                    }else{
+                        if(dy>0&&!canScroll[1]||dy<0&&!canScroll[3])shouldCancelY = true;
+                    }
+                    if(shouldCancelX){
+                        dx = lastDx;
+                    }
+                    if(shouldCancelY){
+                        dy = lastDy;
                     }
                     matrix.set(currentMatrix);
+                    //matrix.postTranslate(shouldCancelX?(lastDx-dx):0,shouldCancelY?(lastDy-dy):0);
                     matrix.postTranslate(dx, dy);
+                    lastDx = dx;
+                    lastDy = dy;
                 }
                 break;
             case MotionEvent.ACTION_UP:
@@ -99,15 +135,59 @@ public class ScalableImageView extends ImageView {
                 break;
         }
         setImageMatrix(matrix);
+        return true;
+    }
+
+    public float[] getImageBound(){
+        float[] bound = new float[4];
+        bound[0]=getDrawable().getBounds().left;
+        bound[1]=getDrawable().getBounds().top;
+        bound[2]=getDrawable().getBounds().right;
+        bound[3]=getDrawable().getBounds().bottom;
+        matrix.mapPoints(bound);
+        return bound;
+    }
+
+    public boolean[] getCanScroll(){
+        boolean[] canScroll = new boolean[4];
+        float[] imageBound = getImageBound();
+        canScroll[0] = imageBound[0]<-touchSlop;
+        canScroll[1] = imageBound[1]<-touchSlop;
+        canScroll[2] = imageBound[2]>getWidth()+touchSlop;
+        canScroll[3] = imageBound[3]>getHeight()+touchSlop;
+        return canScroll;
+    }
+
+    public float getImageLeftBound(){
         float[] leftTop = new float[2];
         leftTop[0]=getDrawable().getBounds().left;
         leftTop[1]=getDrawable().getBounds().top;
-        Log.i("matrix","==================================");
-        Log.i("matrix","leftTop before:"+leftTop[0]+","+leftTop[1]);
         matrix.mapPoints(leftTop);
-        Log.i("matrix","leftTop after:"+leftTop[0]+","+leftTop[1]);
-        Log.i("matrix","==================================");
-        return true;
+        return leftTop[0];
+    }
+
+    public float getImageRightBound(){
+        float[] rightTop = new float[2];
+        rightTop[0]=getDrawable().getBounds().right;
+        rightTop[1]=getDrawable().getBounds().top;
+        matrix.mapPoints(rightTop);
+        return rightTop[0];
+    }
+
+    public float getImageTopBound(){
+        float[] rightTop = new float[2];
+        rightTop[0]=getDrawable().getBounds().right;
+        rightTop[1]=getDrawable().getBounds().top;
+        matrix.mapPoints(rightTop);
+        return rightTop[1];
+    }
+
+    public float getImageBottomBound(){
+        float[] leftBottom = new float[2];
+        leftBottom[0]=getDrawable().getBounds().left;
+        leftBottom[1]=getDrawable().getBounds().bottom;
+        matrix.mapPoints(leftBottom);
+        return leftBottom[1];
     }
 
     private float distance(MotionEvent event){

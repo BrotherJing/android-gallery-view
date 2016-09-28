@@ -72,10 +72,10 @@ public class GalleryView extends ViewGroup {
         frames[2] = new ScalableImageView(getContext());//frames[2].setBackgroundColor(getResources().getColor(android.R.color.holo_orange_dark));
         layoutParams = new MarginLayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT);
         frames[0].setImageResource(R.drawable.koala);
-        frames[1].setImageResource(android.R.drawable.ic_dialog_email);
-        frames[2].setImageResource(R.drawable.koala);
+        frames[1].setImageResource(R.drawable.hydrangeas);
+        frames[2].setImageResource(R.drawable.penguins);
         for (ScalableImageView frame : frames) {
-            frame.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+            frame.resetImageState();
             addView(frame, layoutParams);
         }
         updateFramesVisibility();
@@ -109,11 +109,11 @@ public class GalleryView extends ViewGroup {
             shiftFrames(1);
             updateFramesVisibility();
         }
-        Log.i("gallery","=====================");
+        /*Log.i("gallery","=====================");
         Log.i("gallery","padding left "+getPaddingLeft());
         Log.i("gallery","scrollX"+getScrollX());
         Log.i("gallery","=====================");
-        logFramesStatus();
+        logFramesStatus();*/
         childIndex=0;
     }
 
@@ -136,6 +136,28 @@ public class GalleryView extends ViewGroup {
             frames[1] = frames[2];
             frames[2] = temp;
         }
+    }
+
+    private boolean canChildHandle(ScalableImageView child, int dx, int dy){
+        /*float point[] = new float[2];
+        point[0] = event.getX();
+        point[1] = event.getY();
+        point[0] += getScrollX() - child.getLeft();
+        point[1] += getScrollY() - child.getTop();
+//        Log.i("point",point[0]+","+point[1]);
+//        Log.i("point",child.getLeft()+","+child.getRight()+","+child.getTop()+","+child.getBottom());
+        return point[0]>0&&point[0]<child.getRight()-child.getLeft()&&
+                point[1]>0&&point[1]<child.getBottom()-child.getTop();*/
+        boolean canHandle;
+        boolean childCanScroll[] = child.getCanScroll();
+        if(Math.abs(dx)>Math.abs(dy)) {//left-right scroll
+            if (dx > 0) canHandle = childCanScroll[0];
+            else canHandle = childCanScroll[2];
+        }else {
+            if (dy > 0) canHandle = childCanScroll[1];
+            else canHandle = childCanScroll[3];
+        }
+        return canHandle;
     }
 
     @Override
@@ -186,7 +208,9 @@ public class GalleryView extends ViewGroup {
                 }
                 break;
             case MotionEvent.ACTION_MOVE:
-                intercept = Math.abs(x - lastInterceptX) > Math.abs(y - lastInterceptY);
+                int dx = x - lastInterceptX;
+                int dy = y - lastInterceptY;
+                intercept = !canChildHandle(frames[1], dx, dy);
                 break;
             case MotionEvent.ACTION_UP:
                 intercept = false;
@@ -217,7 +241,10 @@ public class GalleryView extends ViewGroup {
                 mVelocityTracker.computeCurrentVelocity(1000);
                 float xVelo = mVelocityTracker.getXVelocity();
                 if(Math.abs(xVelo)>50){
-                    childIndex = (xVelo>0)?childIndex-1:childIndex+1;
+                    if(xVelo*scrollX<0)
+                        childIndex = (xVelo>0)?childIndex-1:childIndex+1;
+                    else
+                        childIndex = 0;
                 }else{
                     childIndex = (int)Math.floor((scrollX+ getWidth() /2)*1.0/ getWidth());
                 }
