@@ -7,6 +7,7 @@ import android.view.MotionEvent;
 import android.view.VelocityTracker;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageView;
 import android.widget.Scroller;
 
 /**
@@ -44,7 +45,7 @@ public class GalleryView extends ViewGroup {
 
     private Scroller mScroller;
     private VelocityTracker mVelocityTracker;
-    private ImageFrameView[] frames;
+    private ScalableImageView[] frames;
     private LayoutParams layoutParams;
 
     private OnScrollEndListener scrollEndListener;
@@ -65,12 +66,16 @@ public class GalleryView extends ViewGroup {
     }
 
     public void init(){
-        frames = new ImageFrameView[3];
-        frames[0] = new ImageFrameView(getContext());frames[0].setBackgroundColor(getResources().getColor(android.R.color.holo_blue_dark));
-        frames[1] = new ImageFrameView(getContext());frames[1].setBackgroundColor(getResources().getColor(android.R.color.holo_green_dark));
-        frames[2] = new ImageFrameView(getContext());frames[2].setBackgroundColor(getResources().getColor(android.R.color.holo_orange_dark));
+        frames = new ScalableImageView[3];
+        frames[0] = new ScalableImageView(getContext());//frames[0].setBackgroundColor(getResources().getColor(android.R.color.holo_blue_dark));
+        frames[1] = new ScalableImageView(getContext());//frames[1].setBackgroundColor(getResources().getColor(android.R.color.holo_green_dark));
+        frames[2] = new ScalableImageView(getContext());//frames[2].setBackgroundColor(getResources().getColor(android.R.color.holo_orange_dark));
         layoutParams = new MarginLayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT);
-        for (ImageFrameView frame : frames) {
+        frames[0].setImageResource(R.drawable.koala);
+        frames[1].setImageResource(android.R.drawable.ic_dialog_email);
+        frames[2].setImageResource(R.drawable.koala);
+        for (ScalableImageView frame : frames) {
+            frame.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
             addView(frame, layoutParams);
         }
         updateFramesVisibility();
@@ -89,13 +94,15 @@ public class GalleryView extends ViewGroup {
     private void onScrollEnd(){
         lastScrollX = getScrollX();
         if(scrollEndListener!=null)scrollEndListener.onScrollEnd(picIndex);
-        if(childIndex==-1){
+        if(childIndex==-1){//scroll to left
+            frames[1].resetImageState();
             removeView(frames[2]);
             customPaddingLeft = customPaddingLeft-getWidth();
             addView(frames[2],0,layoutParams);
             shiftFrames(-1);
             updateFramesVisibility();
-        }else if(childIndex==1){
+        }else if(childIndex==1){//scroll to right
+            frames[1].resetImageState();
             removeView(frames[0]);
             customPaddingLeft = customPaddingLeft+getWidth();
             addView(frames[0],layoutParams);
@@ -117,7 +124,7 @@ public class GalleryView extends ViewGroup {
     }
 
     private void shiftFrames(int direction){
-        ImageFrameView temp;
+        ScalableImageView temp;
         if(direction==-1){
             temp = frames[2];
             frames[2] = frames[1];

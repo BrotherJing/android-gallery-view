@@ -3,94 +3,85 @@ package io.brotherjing.galleryview;
 import android.content.Context;
 import android.graphics.Matrix;
 import android.graphics.PointF;
-import android.graphics.drawable.BitmapDrawable;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.MotionEvent;
-import android.widget.FrameLayout;
 import android.widget.ImageView;
 
 /**
- * Created by jingyanga on 2016/9/27.
+ * Created by jingyanga on 2016/9/28.
  */
 
-public class ImageFrameView extends FrameLayout {
+public class ScalableImageView extends ImageView {
 
     private int mode;
     private static final int MODE_NONE = 0;
     private static final int MODE_DRAG = 1;
     private static final int MODE_ZOOM = 2;
 
+    private PointF dragStartPoint = new PointF();
+
     private Matrix matrix = new Matrix();
     private Matrix currentMatrix = new Matrix();
     private PointF midPoint = new PointF();
     private float startDistance = 1f;
 
-    private ImageView imageView;
+    private float scale;
+    private float totalScale = 1f;
+    private float currentTotalScale = 1f;
 
-    public ImageFrameView(Context context) {
+    public ScalableImageView(Context context) {
         super(context);
-        init();
     }
 
-    public ImageFrameView(Context context, AttributeSet attrs) {
+    public ScalableImageView(Context context, AttributeSet attrs) {
         super(context, attrs);
-        init();
     }
 
-    public ImageFrameView(Context context, AttributeSet attrs, int defStyleAttr) {
+    public ScalableImageView(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
-        init();
     }
 
-    private void init(){
-        imageView = new ImageView(getContext());
-        imageView.setImageResource(R.drawable.koala);
-        //imageView.setScaleType(ImageView.ScaleType.CENTER);
-        LayoutParams layoutParams = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT);
-        addView(imageView, layoutParams);
+    public void resetImageState(){
+        totalScale = 1f;
+        setScaleType(ScaleType.CENTER_INSIDE);
     }
-
-    /*@Override
-    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-        super.onMeasure(widthMeasureSpec, heightMeasureSpec);
-        measureChildren(widthMeasureSpec, heightMeasureSpec);
-    }
-
-    @Override
-    protected void onLayout(boolean changed, int l, int t, int r, int b) {
-        int childCount = getChildCount();
-        int width = getMeasuredWidth();
-        int height = getMeasuredHeight();
-        for(int i=0;i<childCount;++i){
-            View child = getChildAt(i);
-            int childWidth = child.getMeasuredWidth();
-            int childHeight = child.getMeasuredHeight();
-            int left = (width-childWidth)/2;
-            int top = (height-childHeight)/2;
-            int right = left+childWidth;
-            int bottom = top+childHeight;
-            child.layout(left, top, right, bottom);
-        }
-    }*/
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         switch (event.getAction()&MotionEvent.ACTION_MASK){
             case MotionEvent.ACTION_DOWN:
-                mode = MODE_NONE;
-                currentMatrix.set(imageView.getImageMatrix());
+                mode = MODE_DRAG;
+                currentTotalScale = totalScale;
+                dragStartPoint.set(event.getX(), event.getY());
+                currentMatrix.set(getImageMatrix());
                 break;
             case MotionEvent.ACTION_MOVE:
+                setScaleType(ImageView.ScaleType.MATRIX);
                 if(mode==MODE_ZOOM){
-                    imageView.setScaleType(ImageView.ScaleType.MATRIX);
                     float distance = distance(event);
                     if(distance>10f){
-                        float scale = distance/ startDistance;
+                        scale = distance/ startDistance;
+                        if(currentTotalScale*scale>4f){
+                            scale = 4f/currentTotalScale;
+                            totalScale = 4f;
+                        }else if(currentTotalScale*scale<1f){
+                            scale = 1f/currentTotalScale;
+                            totalScale = 1f;
+                        }else{
+                            totalScale = currentTotalScale*scale;
+                        }
                         matrix.set(currentMatrix);
                         matrix.postScale(scale, scale, midPoint.x, midPoint.y);
-                        //Log.i("gallery", "matrix: "+matrix);
                     }
+                }else if(mode==MODE_DRAG){
+                    float dx = event.getX()-dragStartPoint.x;
+                    float dy = event.getY()-dragStartPoint.y;
+                    if(Math.abs(dy)>Math.abs(dx)){
+                        getParent().requestDisallowInterceptTouchEvent(true);
+                    }
+                    matrix.set(currentMatrix);
+                    matrix.postTranslate(dx, dy);
                 }
                 break;
             case MotionEvent.ACTION_UP:
@@ -100,18 +91,17 @@ public class ImageFrameView extends FrameLayout {
             case MotionEvent.ACTION_POINTER_DOWN:
                 startDistance = distance(event);
                 if(startDistance >10f){
-//                    Log.i("gallery", "start distance: "+startDistance);
                     getParent().requestDisallowInterceptTouchEvent(true);
                     mode = MODE_ZOOM;
                     midPoint = mid(event);
-                    currentMatrix.set(imageView.getImageMatrix());
+                    currentMatrix.set(getImageMatrix());
                 }
                 break;
         }
-        imageView.setImageMatrix(matrix);
+        setImageMatrix(matrix);
         float[] leftTop = new float[2];
-        leftTop[0]=imageView.getDrawable().getBounds().left;
-        leftTop[1]=imageView.getDrawable().getBounds().top;
+        leftTop[0]=getDrawable().getBounds().left;
+        leftTop[1]=getDrawable().getBounds().top;
         Log.i("matrix","==================================");
         Log.i("matrix","leftTop before:"+leftTop[0]+","+leftTop[1]);
         matrix.mapPoints(leftTop);
@@ -132,7 +122,5 @@ public class ImageFrameView extends FrameLayout {
         return new PointF(midX, midY);
     }
 
-    public ImageView getImageView() {
-        return imageView;
-    }
+
 }
