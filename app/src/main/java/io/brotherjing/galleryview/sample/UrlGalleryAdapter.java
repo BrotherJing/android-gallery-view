@@ -13,11 +13,11 @@ import io.brotherjing.galleryview.GalleryAdapter;
  * Created by jingyanga on 2016/9/28.
  */
 
-public class UrlGallaryAdapter extends GalleryAdapter {
+public class UrlGalleryAdapter extends GalleryAdapter {
 
     private List<String> data;
 
-    public UrlGallaryAdapter(Context context, List<String> data) {
+    public UrlGalleryAdapter(Context context, List<String> data) {
         super(context);
         this.data = data;
     }

@@ -1,5 +1,7 @@
 package io.brotherjing.galleryview;
 
+import android.animation.Animator;
+import android.animation.ValueAnimator;
 import android.content.Context;
 import android.graphics.Matrix;
 import android.graphics.PointF;
@@ -16,6 +18,7 @@ import android.widget.ImageView;
 public class ScalableImageView extends ImageView {
 
     private boolean firstTouch = true;
+    private boolean inAnimation = false;
 
     private int touchSlop;
 
@@ -26,14 +29,14 @@ public class ScalableImageView extends ImageView {
 
     private PointF dragStartPoint = new PointF();
     float[] bound;
-    private float dx, dy, lastDx, lastDy;
+    private float lastDx;
+    private float lastDy;
 
     private Matrix matrix = new Matrix();
     private Matrix currentMatrix = new Matrix();
     private PointF midPoint = new PointF();
     private float startDistance = 1f;
 
-    private float scale;
     private float totalScale = 1f;
     private float currentTotalScale = 1f;
 
@@ -64,13 +67,14 @@ public class ScalableImageView extends ImageView {
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
+        if(inAnimation)return false;
         switch (event.getAction()&MotionEvent.ACTION_MASK){
             case MotionEvent.ACTION_DOWN:
                 mode = MODE_DRAG;
                 bound = getImageBound();
                 currentTotalScale = totalScale;
-                lastDx = dx;
-                lastDy = dy;
+                lastDx = 0;
+                lastDy = 0;
                 dragStartPoint.set(event.getX(), event.getY());
                 currentMatrix.set(getImageMatrix());
                 if(firstTouch){
@@ -83,30 +87,27 @@ public class ScalableImageView extends ImageView {
                 if(mode==MODE_ZOOM){
                     float distance = distance(event);
                     if(distance>10f){
-                        scale = distance/ startDistance;
-                        if(currentTotalScale*scale>4f){
+                        float scale = distance / startDistance;
+                        if(currentTotalScale* scale >4f){
                             scale = 4f/currentTotalScale;
                             totalScale = 4f;
-                        }else if(currentTotalScale*scale<1f){
+                        }else if(currentTotalScale* scale <1f){
                             scale = 1f/currentTotalScale;
                             totalScale = 1f;
                         }else{
-                            totalScale = currentTotalScale*scale;
+                            totalScale = currentTotalScale* scale;
                         }
                         matrix.set(currentMatrix);
                         matrix.postScale(scale, scale, midPoint.x, midPoint.y);
                     }
                 }else if(mode==MODE_DRAG){
                     getParent().requestDisallowInterceptTouchEvent(true);
-                    dx = event.getX()-dragStartPoint.x;
-                    dy = event.getY()-dragStartPoint.y;
+                    float dx = event.getX() - dragStartPoint.x;
+                    float dy = event.getY() - dragStartPoint.y;
                     boolean canScroll[] = getCanScroll();
                     boolean shouldCancelX=false,shouldCancelY=false;
-                    if(Math.abs(dx)>Math.abs(dy)){
-                        if(dx>0&&!canScroll[0]||dx<0&&!canScroll[2])shouldCancelX = true;
-                    }else{
-                        if(dy>0&&!canScroll[1]||dy<0&&!canScroll[3])shouldCancelY = true;
-                    }
+                    if(dx >0&&!canScroll[0]|| dx <0&&!canScroll[2])shouldCancelX = true;
+                    if(dy >0&&!canScroll[1]|| dy <0&&!canScroll[3])shouldCancelY = true;
                     if(shouldCancelX){
                         dx = lastDx;
                     }
@@ -122,6 +123,9 @@ public class ScalableImageView extends ImageView {
                 break;
             case MotionEvent.ACTION_UP:
             case MotionEvent.ACTION_POINTER_UP:
+                if(mode==MODE_ZOOM){
+                    if(Math.abs(totalScale-1f)<1e-3)animateBackToCenter();
+                }
                 mode = MODE_NONE;
                 break;
             case MotionEvent.ACTION_POINTER_DOWN:
@@ -136,6 +140,45 @@ public class ScalableImageView extends ImageView {
         }
         setImageMatrix(matrix);
         return true;
+    }
+
+    private void animateBackToCenter(){
+        ValueAnimator animator = ValueAnimator.ofFloat(0f,1f);
+        float bound[] = getImageBound();
+        final float dx = getWidth()/2-(bound[0]+bound[2])/2;
+        final float dy = getHeight()/2-(bound[1]+bound[3])/2;
+        currentMatrix.set(getImageMatrix());
+        animator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+            @Override
+            public void onAnimationUpdate(ValueAnimator animation) {
+                float fraction = animation.getAnimatedFraction();
+                matrix.set(currentMatrix);
+                matrix.postTranslate(dx*fraction, dy*fraction);
+                setImageMatrix(matrix);
+            }
+        });
+        animator.addListener(new Animator.AnimatorListener() {
+            @Override
+            public void onAnimationStart(Animator animation) {
+                inAnimation = true;
+            }
+
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                inAnimation = false;
+            }
+
+            @Override
+            public void onAnimationCancel(Animator animation) {
+                inAnimation = false;
+            }
+
+            @Override
+            public void onAnimationRepeat(Animator animation) {
+
+            }
+        });
+        animator.setDuration(200).start();
     }
 
     public float[] getImageBound(){

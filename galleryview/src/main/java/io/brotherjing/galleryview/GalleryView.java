@@ -146,15 +146,15 @@ public class GalleryView extends ViewGroup {
 //        Log.i("point",child.getLeft()+","+child.getRight()+","+child.getTop()+","+child.getBottom());
         return point[0]>0&&point[0]<child.getRight()-child.getLeft()&&
                 point[1]>0&&point[1]<child.getBottom()-child.getTop();*/
-        boolean canHandle;
+        boolean canHandle = true;
         boolean childCanScroll[] = child.getCanScroll();
         if(Math.abs(dx)>Math.abs(dy)) {//left-right scroll
             if (dx > 0) canHandle = childCanScroll[0];
             else canHandle = childCanScroll[2];
-        }else {
+        }/*else {
             if (dy > 0) canHandle = childCanScroll[1];
             else canHandle = childCanScroll[3];
-        }
+        }*/
         return canHandle;
     }
 
