@@ -7,13 +7,13 @@ a widget for displaying images.
 
 In your `build.gradle`:
 
-```
+```gradle
 compile 'com.github.BrotherJing:android-gallery-view:v1.0.0'
 ```
 
 Then create the gallery view in your layout or code.
 
-```
+```xml
 <io.brotherjing.galleryview.GalleryView
         android:layout_width="match_parent"
         android:layout_height="match_parent"
@@ -57,4 +57,4 @@ Finally,
 galleryView.setAdapter(new UrlGalleryAdapter(this,data));
 ```
 
-![](http://7xrcar.com1.z0.glb.clouddn.com/gallery.gif)
+![](http://7xrcar.com1.z0.glb.clouddn.com/ezgif.com-video-to-gif.gif)
