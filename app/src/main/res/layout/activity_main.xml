@@ -7,11 +7,6 @@
     android:background="@android:color/black"
     tools:context="io.brotherjing.galleryview.sample.MainActivity">
 
-    <!--<io.brotherjing.galleryview.ZoomImageView
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:id="@+id/imageView"/>-->
-
     <io.brotherjing.galleryview.GalleryView
         android:layout_width="match_parent"
         android:layout_height="match_parent"

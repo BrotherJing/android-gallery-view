@@ -7,7 +7,6 @@ import android.view.MotionEvent;
 import android.view.VelocityTracker;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.ImageView;
 import android.widget.Scroller;
 
 /**
@@ -16,27 +15,34 @@ import android.widget.Scroller;
 
 public class GalleryView extends ViewGroup {
 
-    /**
-     * last touch x
-     */
     private int lastX;
     private int lastInterceptX, lastInterceptY;
     private int lastScrollX;
-    private boolean smoothScrolling = false;
 
-    private int childIndex=0;
+    /**
+     * Scrolling by flinging, or dragging.
+     * When a scrolling ends, we only consider flinging as scrolling to a new page.
+     */
+    private boolean flinging = false;
+
+    /**
+     * There are only 3 ImageViews in used, previous, current and next.
+     * When scrolling to next, the previous page is removed and appends to
+     * the last page, vice versa.
+     * Use this padding to adjust their position after scrolling to a new page.
+     */
+    private int customPaddingLeft=0;
+
+    /**
+     * The value can be -1, 0, 1, which represents the previous, current and
+     * next frame.
+     */
+    private int frameIndex =0;
 
     /**
      * current picture index, ranged from 0 to picture length
      */
     private int picIndex=0;
-
-    /**
-     * initial picture index, constant, any number between 0 and picture length-1
-     */
-    private final int initPicIndex=0;
-
-    private int customPaddingLeft=0;
 
     private Scroller mScroller;
     private VelocityTracker mVelocityTracker;
@@ -62,15 +68,12 @@ public class GalleryView extends ViewGroup {
         init();
     }
 
-    public void init(){
+    private void init(){
         frames = new ScalableImageView[3];
-        frames[0] = new ScalableImageView(getContext());//frames[0].setBackgroundColor(getResources().getColor(android.R.color.holo_blue_dark));
-        frames[1] = new ScalableImageView(getContext());//frames[1].setBackgroundColor(getResources().getColor(android.R.color.holo_green_dark));
-        frames[2] = new ScalableImageView(getContext());//frames[2].setBackgroundColor(getResources().getColor(android.R.color.holo_orange_dark));
+        frames[0] = new ScalableImageView(getContext());
+        frames[1] = new ScalableImageView(getContext());
+        frames[2] = new ScalableImageView(getContext());
         layoutParams = new MarginLayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT);
-        /*frames[0].setImageResource(R.drawable.koala);
-        frames[1].setImageResource(R.drawable.hydrangeas);
-        frames[2].setImageResource(R.drawable.penguins);*/
         for (ScalableImageView frame : frames) {
             frame.resetImageState();
             addView(frame, layoutParams);
@@ -82,7 +85,7 @@ public class GalleryView extends ViewGroup {
 
     private void updateFramesVisibility(){
         for(int i=0;i<frames.length;++i){
-            if(picIndex+i-1<0||picIndex+i-1>=adapter.getCount())frames[i].setVisibility(INVISIBLE);
+            if(picIndex+i-1<0||picIndex+i-1>=getPicCount())frames[i].setVisibility(INVISIBLE);
             else frames[i].setVisibility(VISIBLE);
         }
     }
@@ -90,29 +93,22 @@ public class GalleryView extends ViewGroup {
     private void onScrollEnd(){
         lastScrollX = getScrollX();
         if(scrollEndListener!=null)scrollEndListener.onScrollEnd(picIndex);
-        if(childIndex==-1){//scroll to left
-            frames[1].resetImageState();
+        if(frameIndex==0)return;
+
+        frames[1].resetImageState();
+        customPaddingLeft = customPaddingLeft+frameIndex*getWidth();
+        if(frameIndex ==-1){//scroll to left
             removeView(frames[2]);
-            customPaddingLeft = customPaddingLeft-getWidth();
             addView(frames[2],0,layoutParams);
             fillFrame(picIndex-1, frames[2]);
-            shiftFrames(-1);
-            updateFramesVisibility();
-        }else if(childIndex==1){//scroll to right
-            frames[1].resetImageState();
+        }else if(frameIndex ==1){//scroll to right
             removeView(frames[0]);
-            customPaddingLeft = customPaddingLeft+getWidth();
             addView(frames[0],layoutParams);
             fillFrame(picIndex+1, frames[0]);
-            shiftFrames(1);
-            updateFramesVisibility();
         }
-        /*Log.i("gallery","=====================");
-        Log.i("gallery","padding left "+getPaddingLeft());
-        Log.i("gallery","scrollX"+getScrollX());
-        Log.i("gallery","=====================");
-        logFramesStatus();*/
-        childIndex=0;
+        shiftFrames(frameIndex);
+        updateFramesVisibility();
+        frameIndex =0;
     }
 
     private void logFramesStatus(){
@@ -137,31 +133,27 @@ public class GalleryView extends ViewGroup {
     }
 
     private boolean canChildHandle(ScalableImageView child, int dx, int dy){
-        /*float point[] = new float[2];
-        point[0] = event.getX();
-        point[1] = event.getY();
-        point[0] += getScrollX() - child.getLeft();
-        point[1] += getScrollY() - child.getTop();
-//        Log.i("point",point[0]+","+point[1]);
-//        Log.i("point",child.getLeft()+","+child.getRight()+","+child.getTop()+","+child.getBottom());
-        return point[0]>0&&point[0]<child.getRight()-child.getLeft()&&
-                point[1]>0&&point[1]<child.getBottom()-child.getTop();*/
         boolean canHandle = true;
         boolean childCanScroll[] = child.getCanScroll();
         if(Math.abs(dx)>Math.abs(dy)) {//left-right scroll
             if (dx > 0) canHandle = childCanScroll[0];
             else canHandle = childCanScroll[2];
-        }/*else {
-            if (dy > 0) canHandle = childCanScroll[1];
-            else canHandle = childCanScroll[3];
-        }*/
+        }
         return canHandle;
+    }
+
+    private int getPicCount(){
+        if(adapter!=null){
+            return adapter.getCount();
+        }
+        return 0;
     }
 
     public void setAdapter(GalleryAdapter adapter) {
         this.adapter = adapter;
-        updateFramesVisibility();
+        this.picIndex = adapter.getInitPicIndex();
         fillInitialFrames();
+        updateFramesVisibility();
     }
 
     public GalleryAdapter getAdapter() {
@@ -169,16 +161,14 @@ public class GalleryView extends ViewGroup {
     }
 
     private void fillInitialFrames(){
+        if(adapter==null)return;
         for(int i=0;i<frames.length;++i){
-            if(picIndex+i-1<0||picIndex+i-1>=adapter.getCount())continue;
-            else {
-                adapter.fillViewAtPosition(picIndex+i-1, frames[i]);
-            }
+            fillFrame(picIndex+i-1, frames[i]);
         }
     }
 
     private void fillFrame(int position, ScalableImageView imageView){
-        if(position<0||position>=adapter.getCount())return;
+        if(position<0||position>=getPicCount())return;
         adapter.fillViewAtPosition(position, imageView);
     }
 
@@ -206,9 +196,7 @@ public class GalleryView extends ViewGroup {
             int bottom = childHeight + top;
             child.layout(left, top, right, bottom);
             mLeft += childWidth + cParams.leftMargin + cParams.rightMargin;
-            Log.i("gallery","mLeft:"+mLeft+" childWidth="+childWidth);
         }
-        logFramesStatus();
     }
 
     @Override
@@ -259,22 +247,21 @@ public class GalleryView extends ViewGroup {
                 scrollBy(-deltaX, 0);
                 break;
             case MotionEvent.ACTION_UP:
-                int scrollX = getScrollX()-lastScrollX;
+                int deltaScrollX = getScrollX()-lastScrollX;
                 mVelocityTracker.computeCurrentVelocity(1000);
-                float xVelo = mVelocityTracker.getXVelocity();
-                if(Math.abs(xVelo)>50){
-                    if(xVelo*scrollX<0)
-                        childIndex = (xVelo>0)?childIndex-1:childIndex+1;
+                float velocityX = mVelocityTracker.getXVelocity();
+                if(Math.abs(velocityX)>50){
+                    if(velocityX*deltaScrollX<0)//same direction
+                        frameIndex = (velocityX>0)? frameIndex -1: frameIndex +1;
                     else
-                        childIndex = 0;
+                        frameIndex = 0;
                 }else{
-                    childIndex = (int)Math.floor((scrollX+ getWidth() /2)*1.0/ getWidth());
+                    frameIndex = (int)Math.floor((deltaScrollX+ getWidth() /2)*1.0/ getWidth());
                 }
-                childIndex = Math.max(-1, Math.min(childIndex, 1));
-                if(picIndex+childIndex<0||picIndex+childIndex>=adapter.getCount())childIndex=0;
-                picIndex+=childIndex;
-                //Log.i("gallery", childIndex+" "+scrollX+" "+getWidth());
-                int dx = childIndex* getWidth() -scrollX;
+                frameIndex = Math.max(-1, Math.min(frameIndex, 1));
+                if(picIndex+ frameIndex <0||picIndex+ frameIndex >=getPicCount()) frameIndex =0;
+                picIndex+= frameIndex;
+                int dx = frameIndex * getWidth() -deltaScrollX;
                 smoothScrollBy(dx,0);
                 mVelocityTracker.clear();
                 break;
@@ -285,7 +272,7 @@ public class GalleryView extends ViewGroup {
     }
 
     private void smoothScrollBy(int dx, int dy){
-        smoothScrolling = true;
+        flinging = true;
         mScroller.startScroll(getScrollX(), 0, dx, dy, 300);
         invalidate();
     }
@@ -295,12 +282,12 @@ public class GalleryView extends ViewGroup {
         if(mScroller.computeScrollOffset()){
             scrollTo(mScroller.getCurrX(), mScroller.getCurrY());
             postInvalidate();
-        }else{
-            if(smoothScrolling) {
-                scrollTo(mScroller.getCurrX(), mScroller.getCurrY());
+        }else{//if mScroller finished or aborted, or the view is scrolling without the scroller
+            if(flinging) {
+                scrollTo(mScroller.getFinalX(), mScroller.getFinalY());//in case the scrolling is aborted, scroll to final position
                 onScrollEnd();
             }
-            smoothScrolling = false;
+            flinging = false;
         }
     }
 

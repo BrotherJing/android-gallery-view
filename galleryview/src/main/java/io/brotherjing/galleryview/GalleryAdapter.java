@@ -17,6 +17,8 @@ public abstract class GalleryAdapter {
         this.context = context;
     }
 
+    public abstract int getInitPicIndex();
+
     public abstract int getCount();
 
     public abstract void fillViewAtPosition(int position, ImageView imageView);

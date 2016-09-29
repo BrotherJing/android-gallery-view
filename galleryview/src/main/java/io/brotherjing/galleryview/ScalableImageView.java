@@ -5,6 +5,7 @@ import android.animation.ValueAnimator;
 import android.content.Context;
 import android.graphics.Matrix;
 import android.graphics.PointF;
+import android.graphics.drawable.Drawable;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.MotionEvent;
@@ -63,6 +64,12 @@ public class ScalableImageView extends ImageView {
         totalScale = 1f;
         setScaleType(ScaleType.CENTER_INSIDE);
         firstTouch = true;
+    }
+
+    @Override
+    public void setImageDrawable(Drawable drawable) {
+        super.setImageDrawable(drawable);
+        resetImageState();
     }
 
     @Override

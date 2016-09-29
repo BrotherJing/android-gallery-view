@@ -23,6 +23,11 @@ public class UrlGalleryAdapter extends GalleryAdapter {
     }
 
     @Override
+    public int getInitPicIndex() {
+        return 2;
+    }
+
+    @Override
     public int getCount() {
         return data.size();
     }

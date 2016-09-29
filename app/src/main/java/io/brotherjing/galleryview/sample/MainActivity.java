@@ -28,9 +28,6 @@ public class MainActivity extends AppCompatActivity {
                 label.setText((index+1)+"/"+galleryView.getAdapter().getCount());
             }
         });
-        /*ZoomImageView imageView = (ZoomImageView)findViewById(R.id.imageView);
-        Bitmap bitmap = BitmapFactory.decodeResource(getResources(), R.drawable.koala);
-        imageView.setImageBitmap(bitmap);*/
         List<String> data = new ArrayList<>();
         data.add("http://7xrcar.com1.z0.glb.clouddn.com/Tulips.jpg");
         data.add("http://7xrcar.com1.z0.glb.clouddn.com/Penguins.jpg");
