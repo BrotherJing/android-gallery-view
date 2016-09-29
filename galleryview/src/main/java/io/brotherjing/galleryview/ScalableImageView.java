@@ -7,7 +7,6 @@ import android.graphics.Matrix;
 import android.graphics.PointF;
 import android.graphics.drawable.Drawable;
 import android.util.AttributeSet;
-import android.util.Log;
 import android.view.MotionEvent;
 import android.view.ViewConfiguration;
 import android.widget.ImageView;
@@ -18,7 +17,15 @@ import android.widget.ImageView;
 
 public class ScalableImageView extends ImageView {
 
+    /**
+     * The initial scaleType is CENTER_INSIDE, but we want to manipulate the image with MATRIX.
+     * On first touch, we set scaleType to MATRIX, and retrieve the original image matrix.
+     */
     private boolean firstTouch = true;
+
+    /**
+     * Disable touch event when in animation.
+     */
     private boolean inAnimation = false;
 
     private int touchSlop;
@@ -29,7 +36,6 @@ public class ScalableImageView extends ImageView {
     private static final int MODE_ZOOM = 2;
 
     private PointF dragStartPoint = new PointF();
-    float[] bound;
     private float lastDx;
     private float lastDy;
 
@@ -39,7 +45,7 @@ public class ScalableImageView extends ImageView {
     private float startDistance = 1f;
 
     private float totalScale = 1f;
-    private float currentTotalScale = 1f;
+    private float lastTotalScale = 1f;
 
     public ScalableImageView(Context context) {
         super(context);
@@ -78,7 +84,6 @@ public class ScalableImageView extends ImageView {
         switch (event.getAction()&MotionEvent.ACTION_MASK){
             case MotionEvent.ACTION_DOWN:
                 mode = MODE_DRAG;
-                bound = getImageBound();
                 lastDx = 0;
                 lastDy = 0;
                 dragStartPoint.set(event.getX(), event.getY());
@@ -94,14 +99,14 @@ public class ScalableImageView extends ImageView {
                     float distance = distance(event);
                     if(distance>10f){
                         float scale = distance / startDistance;
-                        if(currentTotalScale* scale >4f){
-                            scale = 4f/currentTotalScale;
+                        if(lastTotalScale * scale >4f){
+                            scale = 4f/ lastTotalScale;
                             totalScale = 4f;
-                        }else if(currentTotalScale* scale <1f){
-                            scale = 1f/currentTotalScale;
+                        }else if(lastTotalScale * scale <1f){
+                            scale = 1f/ lastTotalScale;
                             totalScale = 1f;
                         }else{
-                            totalScale = currentTotalScale* scale;
+                            totalScale = lastTotalScale * scale;
                         }
                         matrix.set(currentMatrix);
                         matrix.postScale(scale, scale, midPoint.x, midPoint.y);
@@ -111,17 +116,18 @@ public class ScalableImageView extends ImageView {
                     float dx = event.getX() - dragStartPoint.x;
                     float dy = event.getY() - dragStartPoint.y;
                     boolean canScroll[] = getCanScroll();
-                    boolean shouldCancelX=false,shouldCancelY=false;
-                    if(dx >0&&!canScroll[0]|| dx <0&&!canScroll[2])shouldCancelX = true;
-                    if(dy >0&&!canScroll[1]|| dy <0&&!canScroll[3])shouldCancelY = true;
+                    boolean shouldCancelX=false, shouldCancelY=false;
+                    if(dx-lastDx >0&&!canScroll[0]|| dx-lastDx <0&&!canScroll[2])shouldCancelX = true;
+                    if(dy-lastDy >0&&!canScroll[1]|| dy-lastDy <0&&!canScroll[3])shouldCancelY = true;
                     if(shouldCancelX){
+                        dragStartPoint.x = event.getX() - lastDx;
                         dx = lastDx;
                     }
                     if(shouldCancelY){
+                        dragStartPoint.y = event.getY() - lastDy;
                         dy = lastDy;
                     }
                     matrix.set(currentMatrix);
-                    //matrix.postTranslate(shouldCancelX?(lastDx-dx):0,shouldCancelY?(lastDy-dy):0);
                     matrix.postTranslate(dx, dy);
                     lastDx = dx;
                     lastDy = dy;
@@ -135,7 +141,7 @@ public class ScalableImageView extends ImageView {
                 mode = MODE_NONE;
                 break;
             case MotionEvent.ACTION_POINTER_DOWN:
-                currentTotalScale = totalScale;
+                lastTotalScale = totalScale;
                 startDistance = distance(event);
                 if(startDistance >10f){
                     getParent().requestDisallowInterceptTouchEvent(true);
@@ -149,9 +155,12 @@ public class ScalableImageView extends ImageView {
         return true;
     }
 
+    /**
+     * When the image zooms to 1x, it may not be positioned at the center, animate it back.
+     */
     private void animateBackToCenter(){
         ValueAnimator animator = ValueAnimator.ofFloat(0f,1f);
-        float bound[] = getImageBound();
+        float bound[] = getImageBounds();
         final float dx = getWidth()/2-(bound[0]+bound[2])/2;
         final float dy = getHeight()/2-(bound[1]+bound[3])/2;
         currentMatrix.set(getImageMatrix());
@@ -188,7 +197,11 @@ public class ScalableImageView extends ImageView {
         animator.setDuration(200).start();
     }
 
-    public float[] getImageBound(){
+    /**
+     * Get the actual bounds of the image, not the view, after mapping the matrix on it.
+     * @return the left, top, right, bottom bounds of the image.
+     */
+    public float[] getImageBounds(){
         float[] bound = new float[4];
         bound[0]=getDrawable().getBounds().left;
         bound[1]=getDrawable().getBounds().top;
@@ -198,46 +211,18 @@ public class ScalableImageView extends ImageView {
         return bound;
     }
 
+    /**
+     * Check if the image has reached its bounds.
+     * @return whether the image has reached its left, top, right, bottom bounds.
+     */
     public boolean[] getCanScroll(){
         boolean[] canScroll = new boolean[4];
-        float[] imageBound = getImageBound();
+        float[] imageBound = getImageBounds();
         canScroll[0] = imageBound[0]<-touchSlop;
         canScroll[1] = imageBound[1]<-touchSlop;
         canScroll[2] = imageBound[2]>getWidth()+touchSlop;
         canScroll[3] = imageBound[3]>getHeight()+touchSlop;
         return canScroll;
-    }
-
-    public float getImageLeftBound(){
-        float[] leftTop = new float[2];
-        leftTop[0]=getDrawable().getBounds().left;
-        leftTop[1]=getDrawable().getBounds().top;
-        matrix.mapPoints(leftTop);
-        return leftTop[0];
-    }
-
-    public float getImageRightBound(){
-        float[] rightTop = new float[2];
-        rightTop[0]=getDrawable().getBounds().right;
-        rightTop[1]=getDrawable().getBounds().top;
-        matrix.mapPoints(rightTop);
-        return rightTop[0];
-    }
-
-    public float getImageTopBound(){
-        float[] rightTop = new float[2];
-        rightTop[0]=getDrawable().getBounds().right;
-        rightTop[1]=getDrawable().getBounds().top;
-        matrix.mapPoints(rightTop);
-        return rightTop[1];
-    }
-
-    public float getImageBottomBound(){
-        float[] leftBottom = new float[2];
-        leftBottom[0]=getDrawable().getBounds().left;
-        leftBottom[1]=getDrawable().getBounds().bottom;
-        matrix.mapPoints(leftBottom);
-        return leftBottom[1];
     }
 
     private float distance(MotionEvent event){
@@ -251,6 +236,5 @@ public class ScalableImageView extends ImageView {
         float midY = (event.getY(1)+event.getY(0))/2;
         return new PointF(midX, midY);
     }
-
 
 }
