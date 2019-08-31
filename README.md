@@ -57,4 +57,4 @@ Finally,
 galleryView.setAdapter(new UrlGalleryAdapter(this,data));
 ```
 
-![](http://7xrcar.com1.z0.glb.clouddn.com/ezgif.com-video-to-gif.gif)
+![](https://brotherjing-static.s3-ap-northeast-1.amazonaws.com/img/ezgif.com-video-to-gif.gif)
